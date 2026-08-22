@@ -9,17 +9,18 @@
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#172018;touch-action:none;font-family:Georgia,serif;-webkit-user-select:none;user-select:none}
 canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
-#rotate{display:none;position:fixed;inset:0;background:#1b241c;color:#f6e4ba;z-index:20;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:22px}
+#rotate{display:none;position:fixed;inset:0;background:#1b241c;color:#f6e4ba;z-index:30;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:22px}
 @media (orientation:portrait){#rotate{display:flex}}
-#joyBase{position:fixed;left:max(22px,env(safe-area-inset-left));bottom:max(24px,env(safe-area-inset-bottom));width:120px;height:120px;border-radius:50%;background:rgba(20,20,20,.28);border:3px solid rgba(255,255,255,.25);z-index:10;touch-action:none}
-#joyKnob{position:absolute;left:34px;top:34px;width:52px;height:52px;border-radius:50%;background:rgba(244,217,165,.88);border:3px solid #6f4b2e;box-shadow:0 3px 8px rgba(0,0,0,.35)}
-#action{position:fixed;right:max(24px,env(safe-area-inset-right));bottom:max(34px,env(safe-area-inset-bottom));width:92px;height:92px;border-radius:50%;background:#e5b85d;border:5px solid #704522;color:#392716;font:bold 18px Georgia;z-index:10;box-shadow:0 5px 0 #4c321e;touch-action:none}
-#hotbar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom));display:flex;gap:8px;z-index:9}
-.tool{width:64px;height:64px;border-radius:13px;border:3px solid #704522;background:#e3c184;color:#392716;font:bold 11px Georgia;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 0 #4b321f;touch-action:none}
+#joyBase{position:fixed;left:max(20px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:116px;height:116px;border-radius:50%;background:rgba(20,20,20,.25);border:3px solid rgba(255,255,255,.22);z-index:10;touch-action:none}
+#joyKnob{position:absolute;left:32px;top:32px;width:52px;height:52px;border-radius:50%;background:rgba(244,217,165,.9);border:3px solid #6f4b2e;box-shadow:0 3px 8px rgba(0,0,0,.35)}
+#action{position:fixed;right:max(22px,env(safe-area-inset-right));bottom:max(30px,env(safe-area-inset-bottom));width:88px;height:88px;border-radius:50%;background:#e5b85d;border:5px solid #704522;color:#392716;font:bold 17px Georgia;z-index:10;box-shadow:0 5px 0 #4c321e;touch-action:none}
+#hotbar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom));display:flex;gap:7px;z-index:9}
+.tool{width:60px;height:60px;border-radius:12px;border:3px solid #704522;background:#e3c184;color:#392716;font:bold 10px Georgia;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 0 #4b321f;touch-action:none}
 .tool.active{background:#fff0b8;transform:translateY(-5px)}
-.tool .ico{font-size:25px;line-height:25px}
-#msg{position:fixed;left:50%;top:max(76px,calc(env(safe-area-inset-top) + 46px));transform:translateX(-50%);max-width:70vw;padding:10px 16px;border-radius:12px;background:rgba(247,223,174,.96);border:3px solid #704522;color:#392716;font:bold 15px Georgia;text-align:center;z-index:8;opacity:0;transition:opacity .18s}
+.tool .ico{font-size:23px;line-height:23px}
+#msg{position:fixed;left:50%;top:max(70px,calc(env(safe-area-inset-top) + 42px));transform:translateX(-50%);max-width:68vw;padding:9px 15px;border-radius:12px;background:rgba(247,223,174,.96);border:3px solid #704522;color:#392716;font:bold 14px Georgia;text-align:center;z-index:8;opacity:0;transition:opacity .18s}
 #msg.show{opacity:1}
+#moveMode{position:fixed;right:max(18px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));z-index:11;background:rgba(239,211,155,.92);border:3px solid #704522;color:#392716;border-radius:12px;padding:8px 10px;font:bold 11px Georgia}
 </style></head>
 <body>
 <canvas id="game"></canvas>
@@ -32,53 +33,79 @@ canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
 <button class="tool" data-tool="3"><span class="ico">🧺</span>HAND</button>
 </div>
 <button id="action">USE</button>
+<button id="moveMode">TAP + JOYSTICK</button>
 <div id="msg"></div>
 <script>
 const c=document.getElementById('game'),ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;
-const WORLD={w:1280,h:720,t:40};
-let state={player:{x:15.2,y:10.7},day:1,mins:490,money:18420,energy:100,waterFixed:false,met:false,tool:0,plots:{},inv:{seeds:12,tomato:0}};
-try{const s=localStorage.getItem('wce-mobile-v1');if(s)state=JSON.parse(s)}catch(e){}
-const save=()=>localStorage.setItem('wce-mobile-v1',JSON.stringify(state));
-let scale=1,offX=0,offY=0;
-function resize(){const dpr=Math.min(2,devicePixelRatio||1);c.width=innerWidth*dpr;c.height=innerHeight*dpr;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(innerWidth/WORLD.w,innerHeight/WORLD.h);offX=(innerWidth-WORLD.w*scale)/2;offY=(innerHeight-WORLD.h*scale)/2}addEventListener('resize',resize);resize();
-const R=(x,y,w,h,col)=>{ctx.fillStyle=col;ctx.fillRect(offX+x*scale,offY+y*scale,w*scale,h*scale)};
-function T(s,x,y,size=16,col='#3c2918',align='left'){ctx.fillStyle=col;ctx.font=`bold ${size*scale}px Georgia`;ctx.textAlign=align;ctx.fillText(s,offX+x*scale,offY+y*scale)}
-function circle(x,y,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(offX+x*scale,offY+y*scale,r*scale,0,Math.PI*2);ctx.fill()}
-function tree(tx,ty){let x=tx*40,y=ty*40;R(x+17,y+27,16,70,'#684427');circle(x+25,y+24,47,'#4f773d');circle(x+2,y+18,27,'#718d48');circle(x+48,y+8,24,'#647f42')}
-function crop(x,y,p){if(p.stage===0){R(x-3,y-2,6,8,'#5e8d3c')}else if(p.stage>0){R(x-4,y-14,8,20,'#4e8138');if(p.stage>1)circle(x+5,y-8,5,'#d34f35')}}
+const WORLD={w:1600,h:980,t:40};
+const SAVE_KEY='wce-mobile-v2';
+let state={player:{x:610,y:510,vx:0,vy:0,face:'down'},day:1,mins:490,money:18420,energy:100,waterFixed:false,met:false,tool:0,plots:{},inv:{seeds:12,tomato:0}};
+try{const s=localStorage.getItem(SAVE_KEY)||localStorage.getItem('wce-mobile-v1');if(s){const old=JSON.parse(s);if(old.player&&old.player.x<50){old.player={x:old.player.x*40,y:old.player.y*40,vx:0,vy:0,face:'down'}}state={...state,...old,player:{...state.player,...old.player},inv:{...state.inv,...old.inv}}}}catch(e){}
+const save=()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(state))}catch(e){}};
+let dpr=1,VW=innerWidth,VH=innerHeight,zoom=1,cam={x:0,y:0};
+function resize(){dpr=Math.min(2,devicePixelRatio||1);VW=innerWidth;VH=innerHeight;c.width=Math.round(VW*dpr);c.height=Math.round(VH*dpr);c.style.width=VW+'px';c.style.height=VH+'px';ctx.setTransform(dpr,0,0,dpr,0,0);zoom=Math.max(.92,Math.min(1.18,VH/430));}addEventListener('resize',resize);resize();
+const sx=x=>(x-cam.x)*zoom, sy=y=>(y-cam.y)*zoom;
+function R(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(Math.round(sx(x)),Math.round(sy(y)),Math.ceil(w*zoom),Math.ceil(h*zoom))}
+function C(x,y,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.arc(sx(x),sy(y),r*zoom,0,Math.PI*2);ctx.fill()}
+function T(s,x,y,size=16,col='#3c2918',align='left'){ctx.fillStyle=col;ctx.font=`bold ${size*zoom}px Georgia`;ctx.textAlign=align;ctx.fillText(s,sx(x),sy(y))}
+function SR(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(x,y,w,h)}
+function ST(s,x,y,size=16,col='#3c2918',align='left'){ctx.fillStyle=col;ctx.font=`bold ${size}px Georgia`;ctx.textAlign=align;ctx.fillText(s,x,y)}
+function tree(x,y){R(x-8,y+14,16,70,'#684427');C(x,y,47,'#4f773d');C(x-22,y+3,27,'#718d48');C(x+25,y-8,24,'#647f42')}
+function crop(x,y,p){if(p.stage===0){R(x-3,y-2,6,8,'#5e8d3c')}else if(p.stage>0){R(x-4,y-14,8,20,'#4e8138');if(p.stage>1)C(x+5,y-8,5,'#d34f35')}}
 function drawWorld(){
- R(0,0,1280,720,'#9fb464');
- for(let j=0;j<18;j++)for(let i=0;i<32;i++){let n=((i*97+j*43)%13)/13;if(n>.58)R(i*40,j*40,40,40,n>.82?'#a9bd6b':'#a3b864')}
- R(0,0,1280,105,'#6abecf');R(0,0,1280,38,'#91d8df');for(let i=0;i<24;i++)R((i*71)%1280,52+(i*23)%40,31,2,'#bce8e4');
- R(0,104,1280,18,'#d1b47b');
+ R(0,0,WORLD.w,WORLD.h,'#9fb464');
+ for(let j=0;j<25;j++)for(let i=0;i<40;i++){let n=((i*97+j*43)%13)/13;if(n>.58)R(i*40,j*40,40,40,n>.82?'#a9bd6b':'#a3b864')}
+ R(0,0,WORLD.w,120,'#6abecf');R(0,0,WORLD.w,44,'#91d8df');for(let i=0;i<32;i++)R((i*71)%WORLD.w,58+(i*23)%43,31,2,'#bce8e4');R(0,118,WORLD.w,18,'#d1b47b');
  // farmhouse
- R(120,130,360,185,'#d8c08f');R(105,118,390,31,'#b85c32');R(140,98,320,36,'#c96a37');R(180,215,60,100,'#477080');R(340,215,62,100,'#71482b');R(267,170,55,48,'#5f8a99');R(275,178,39,32,'#ddc989');T('CASA BIANCA',300,156,16,'#73502d','center');
- [[2,5],[5,9],[27,5],[29,9]].forEach(v=>tree(...v));
+ R(170,180,400,210,'#d8c08f');R(150,165,440,34,'#b85c32');R(195,142,350,38,'#c96a37');R(230,278,68,112,'#477080');R(412,278,70,112,'#71482b');R(322,225,58,50,'#5f8a99');R(330,233,42,34,'#ddc989');T('CASA BIANCA',370,214,17,'#73502d','center');
+ [[95,290],[135,500],[1330,250],[1450,500],[1240,730],[280,770]].forEach(v=>tree(...v));
  // well
- R(70,430,110,28,'#a7865b');R(82,400,86,45,'#c5a875');R(94,412,62,24,'#4d7c91');T(state.waterFixed?'WELL ✓':'BROKEN WELL',125,475,12,'#49331f','center');
+ R(110,565,120,30,'#a7865b');R(123,532,94,47,'#c5a875');R(137,545,66,24,'#4d7c91');T(state.waterFixed?'WELL ✓':'BROKEN WELL',170,616,12,'#49331f','center');
  // field
- R(470,345,430,285,'#8c5b32');for(let j=0;j<6;j++)for(let i=0;i<9;i++){let k=i+','+j,p=state.plots[k];R(480+i*46,355+j*43,38,35,p?'#75502f':'#9d6938');if(p)crop(499+i*46,372+j*43,p)}
- // sign/npc/pen
- R(1015,300,12,80,'#76502f');R(970,290,105,45,'#d2b57b');T('VILLAGE →',1022,318,13,'#52351f','center');
- R(1072,492,16,28,'#315d7d');circle(1080,485,9,'#d2a06f');T('Giuseppe',1080,470,12,'#392716','center');
- R(930,410,260,8,'#79502f');R(930,590,260,8,'#79502f');R(930,410,8,188,'#79502f');R(1182,410,8,188,'#79502f');circle(1010,550,12,'#f4ead0');circle(1021,542,4,'#d84d35');
- R(0,635,1280,85,'#d4b16f');for(let i=0;i<1280;i+=80)R(i,666,50,5,'#c09a5c');
+ R(620,480,455,300,'#8c5b32');for(let j=0;j<6;j++)for(let i=0;i<9;i++){let k=i+','+j,p=state.plots[k];R(633+i*48,493+j*45,39,36,p?'#75502f':'#9d6938');if(p)crop(652+i*48,510+j*45,p)}
+ // sign, Giuseppe and pen
+ R(1275,390,12,82,'#76502f');R(1225,378,115,47,'#d2b57b');T('VILLAGE →',1283,407,13,'#52351f','center');R(1328,548,17,30,'#315d7d');C(1336,540,10,'#d2a06f');T('Giuseppe',1336,522,12,'#392716','center');
+ R(1160,555,300,8,'#79502f');R(1160,790,300,8,'#79502f');R(1160,555,8,243,'#79502f');R(1452,555,8,243,'#79502f');C(1245,710,13,'#f4ead0');C(1257,702,4,'#d84d35');
+ R(0,850,WORLD.w,130,'#d4b16f');for(let i=0;i<WORLD.w;i+=80)R(i,895,52,5,'#c09a5c');
 }
-function drawPlayer(){let px=state.player.x*40,py=state.player.y*40;circle(px,py-15,10,'#6a3d26');R(px-9,py-7,18,26,'#ebe3d2');R(px-8,py+18,7,15,'#355e77');R(px+2,py+18,7,15,'#355e77')}
-function hud(){R(18,15,205,72,'#efd39b');R(240,15,158,43,'#efd39b');let h=Math.floor(state.mins/60)%24,m=Math.floor(state.mins%60).toString().padStart(2,'0');T(`Spring · Day ${state.day}`,32,42,18);T(`${String(h).padStart(2,'0')}:${m}`,32,70,18);T(`€ ${state.money.toLocaleString()}`,319,44,18,'#392716','center');R(1030,18,220,25,'#493b28');R(1035,23,2.05*Math.max(0,state.energy),15,'#8fba4c');T(`Seeds ${state.inv.seeds}   Tomatoes ${state.inv.tomato}`,20,705,14,'#fff')}
-function msg(s){const el=document.getElementById('msg');el.textContent=s;el.classList.add('show');clearTimeout(msg.t);msg.t=setTimeout(()=>el.classList.remove('show'),2600)}
-function nearestAction(){let p=state.player;if(Math.hypot(p.x-3.0,p.y-10.8)<2.1)return 'well';if(Math.hypot(p.x-27,p.y-12.7)<2.0)return 'giuseppe';return null}
+function drawPlayer(t){const p=state.player,moving=Math.hypot(p.vx,p.vy)>.15,bob=moving?Math.sin(t*.015)*1.7:0,step=moving?Math.sin(t*.022)*4:0;ctx.save();ctx.globalAlpha=.22;C(p.x,p.y+20,13,'#1b2018');ctx.restore();C(p.x,p.y-16+bob,10,'#6a3d26');R(p.x-9,p.y-8+bob,18,26,'#ebe3d2');
+ if(p.face==='left'||p.face==='right'){R(p.x-7,p.y+16+bob+step,6,16,'#355e77');R(p.x+2,p.y+16+bob-step,6,16,'#355e77')}else{R(p.x-8,p.y+16+bob+step,7,16,'#355e77');R(p.x+2,p.y+16+bob-step,7,16,'#355e77')}
+ // tiny facing cue
+ if(p.face==='left')R(p.x-13,p.y-3+bob,5,8,'#d4a06c');if(p.face==='right')R(p.x+8,p.y-3+bob,5,8,'#d4a06c');if(p.face==='up')R(p.x-7,p.y-26+bob,14,4,'#5a321f');
+}
+function hud(){SR(14,12,188,63,'rgba(239,211,155,.94)');SR(214,12,145,38,'rgba(239,211,155,.94)');let h=Math.floor(state.mins/60)%24,m=Math.floor(state.mins%60).toString().padStart(2,'0');ST(`Spring · Day ${state.day}`,27,35,16);ST(`${String(h).padStart(2,'0')}:${m}`,27,58,16);ST(`€ ${state.money.toLocaleString()}`,286,38,16,'#392716','center');SR(VW-226,54,200,20,'rgba(73,59,40,.9)');SR(VW-222,58,1.9*Math.max(0,state.energy),12,'#8fba4c');ST(`Seeds ${state.inv.seeds}   Tomatoes ${state.inv.tomato}`,16,VH-10,12,'#fff')}
+function msg(s){const el=document.getElementById('msg');el.textContent=s;el.classList.add('show');clearTimeout(msg.t);msg.t=setTimeout(()=>el.classList.remove('show'),2200)}
+function near(x,y,r){return Math.hypot(state.player.x-x,state.player.y-y)<r}
+function nearestAction(){if(near(170,565,95))return 'well';if(near(1336,560,85))return 'giuseppe';return null}
 function action(){let a=nearestAction();if(a==='well'&&!state.waterFixed){state.waterFixed=true;state.money-=85;msg('Pump capacitor replaced. Water restored. −€85');save();return}if(a==='well'){msg('The well is working.');return}if(a==='giuseppe'){state.met=true;msg('Giuseppe: “The land is good. But do not trust the August sun.”');save();return}msg('Nothing to use here.')}
-document.getElementById('action').addEventListener('pointerdown',e=>{e.preventDefault();action()});
+document.getElementById('action').addEventListener('pointerdown',e=>{e.preventDefault();moveTarget=null;action()});
 [...document.querySelectorAll('.tool')].forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();state.tool=+b.dataset.tool;document.querySelectorAll('.tool').forEach(q=>q.classList.remove('active'));b.classList.add('active');save()}));
-// joystick
+// joystick: analog, 8-direction, dead zone
 const base=document.getElementById('joyBase'),knob=document.getElementById('joyKnob');let joy={id:null,x:0,y:0};
-function joyMove(e){let r=base.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,mag=Math.hypot(dx,dy),lim=42;if(mag>lim){dx*=lim/mag;dy*=lim/mag}joy.x=dx/lim;joy.y=dy/lim;knob.style.transform=`translate(${dx}px,${dy}px)`}
+function joyMove(e){let r=base.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,mag=Math.hypot(dx,dy),lim=40;if(mag>lim){dx*=lim/mag;dy*=lim/mag}let nx=dx/lim,ny=dy/lim;if(Math.hypot(nx,ny)<.14){nx=ny=0}joy.x=nx;joy.y=ny;knob.style.transform=`translate(${dx}px,${dy}px)`;if(nx||ny)moveTarget=null}
 base.addEventListener('pointerdown',e=>{joy.id=e.pointerId;base.setPointerCapture(e.pointerId);joyMove(e)});base.addEventListener('pointermove',e=>{if(e.pointerId===joy.id)joyMove(e)});function joyEnd(e){if(e.pointerId===joy.id){joy.id=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}}base.addEventListener('pointerup',joyEnd);base.addEventListener('pointercancel',joyEnd);
-// tap adjacent field to use selected tool
-c.addEventListener('pointerdown',e=>{let wx=(e.clientX-offX)/scale,wy=(e.clientY-offY)/scale;let i=Math.floor((wx-480)/46),j=Math.floor((wy-355)/43);if(i<0||i>8||j<0||j>5)return;let cx=(499+i*46)/40,cy=(372+j*43)/40;if(Math.hypot(state.player.x-cx,state.player.y-cy)>2.25){msg('Move closer to the soil.');return}let k=i+','+j,p=state.plots[k];if(state.tool===0&&!p){state.plots[k]={stage:-1,water:false};state.energy--;msg('Soil prepared.')}else if(state.tool===2&&p&&p.stage===-1&&state.inv.seeds>0){p.stage=0;state.inv.seeds--;state.energy--;msg('Tomato seed planted.')}else if(state.tool===1&&p&&p.stage>=0){if(!state.waterFixed)msg('Repair the well first.');else{p.water=true;state.energy--;msg('Watered.')}}else if(state.tool===3&&p&&p.stage>=2){state.inv.tomato+=2;state.money+=4;delete state.plots[k];msg('Harvested 2 tomatoes. +€4')}save()});
+// collisions use the character's feet, like a farming RPG
+const blockers=[
+ {x:150,y:175,w:440,h:215},
+ {x:105,y:525,w:130,h:80},
+ {x:1155,y:548,w:312,h:255},
+ {x:65,y:238,w:65,h:125},{x:105,y:448,w:70,h:125},{x:1300,y:198,w:70,h:125},{x:1420,y:445,w:70,h:125},{x:1210,y:675,w:70,h:120},{x:250,y:715,w:70,h:120}
+];
+function collides(x,y){const r=10; if(x<18||y<145||x>WORLD.w-18||y>WORLD.h-35)return true;for(const b of blockers)if(x+r>b.x&&x-r<b.x+b.w&&y+7>b.y&&y-7<b.y+b.h)return true;return false}
+function moveWithCollision(dx,dy){let p=state.player,nx=p.x+dx,ny=p.y;if(!collides(nx,ny))p.x=nx;nx=p.x;ny=p.y+dy;if(!collides(nx,ny))p.y=ny}
+let moveTarget=null;
+function screenToWorld(clientX,clientY){return{x:cam.x+clientX/zoom,y:cam.y+clientY/zoom}}
+function fieldAt(wx,wy){let i=Math.floor((wx-633)/48),j=Math.floor((wy-493)/45);if(i<0||i>8||j<0||j>5)return null;return{i,j,k:i+','+j,cx:652+i*48,cy:510+j*45}}
+function useField(f){if(Math.hypot(state.player.x-f.cx,state.player.y-f.cy)>86){moveTarget={x:f.cx,y:f.cy+48,field:f};return}let p=state.plots[f.k];if(state.tool===0&&!p){state.plots[f.k]={stage:-1,water:false};state.energy--;msg('Soil prepared.')}else if(state.tool===2&&p&&p.stage===-1&&state.inv.seeds>0){p.stage=0;state.inv.seeds--;state.energy--;msg('Tomato seed planted.')}else if(state.tool===1&&p&&p.stage>=0){if(!state.waterFixed)msg('Repair the well first.');else{p.water=true;state.energy--;msg('Watered.')}}else if(state.tool===3&&p&&p.stage>=2){state.inv.tomato+=2;state.money+=4;delete state.plots[f.k];msg('Harvested 2 tomatoes. +€4')}save()}
+c.addEventListener('pointerdown',e=>{if(e.clientY>VH-110)return;const w=screenToWorld(e.clientX,e.clientY),f=fieldAt(w.x,w.y);if(f){useField(f);return}moveTarget={x:w.x,y:w.y};});
+function updateFacing(dx,dy){if(Math.abs(dx)>.15||Math.abs(dy)>.15){if(Math.abs(dx)>Math.abs(dy))state.player.face=dx<0?'left':'right';else state.player.face=dy<0?'up':'down'}}
 let last=performance.now(),saveTimer=0;
-function loop(t){let dt=Math.min(.04,(t-last)/1000);last=t;let speed=3.25;state.player.x=Math.max(.5,Math.min(31.4,state.player.x+joy.x*speed*dt));state.player.y=Math.max(3.1,Math.min(16.4,state.player.y+joy.y*speed*dt));state.mins+=dt*2.8;if(state.mins>=1320){state.day++;state.mins=480;state.energy=100;Object.values(state.plots).forEach(p=>{if(p.water){p.water=false;if(p.stage>=0)p.stage=Math.min(2,p.stage+1)}});msg(`Day ${state.day}. Another hot Sicilian morning.`);save()}saveTimer+=dt;if(saveTimer>5){saveTimer=0;save()}ctx.clearRect(0,0,innerWidth,innerHeight);drawWorld();drawPlayer();hud();requestAnimationFrame(loop)}
-requestAnimationFrame(loop);
-msg('Day 1 — Repair the well, then start your first tomato plot.');
+function loop(t){let dt=Math.min(.035,(t-last)/1000);last=t,p=state.player;let ix=joy.x,iy=joy.y;
+ if(!ix&&!iy&&moveTarget){let dx=moveTarget.x-p.x,dy=moveTarget.y-p.y,d=Math.hypot(dx,dy);if(d<12){let pending=moveTarget.field;moveTarget=null;if(pending)useField(pending)}else{ix=dx/d;iy=dy/d}}
+ let mag=Math.hypot(ix,iy);if(mag>1){ix/=mag;iy/=mag}const maxSpeed=155;let desiredX=ix*maxSpeed,desiredY=iy*maxSpeed;const accel=(ix||iy)?13:18;let blend=1-Math.exp(-accel*dt);p.vx+=(desiredX-p.vx)*blend;p.vy+=(desiredY-p.vy)*blend;if(Math.abs(p.vx)<.4)p.vx=0;if(Math.abs(p.vy)<.4)p.vy=0;updateFacing(p.vx,p.vy);moveWithCollision(p.vx*dt,p.vy*dt);
+ // smooth camera follow, keeping controls/HUD screen-space
+ let viewW=VW/zoom,viewH=VH/zoom,targetCamX=p.x-viewW/2,targetCamY=p.y-viewH/2;targetCamX=Math.max(0,Math.min(WORLD.w-viewW,targetCamX));targetCamY=Math.max(0,Math.min(WORLD.h-viewH,targetCamY));let cf=1-Math.exp(-8*dt);cam.x+=(targetCamX-cam.x)*cf;cam.y+=(targetCamY-cam.y)*cf;
+ state.mins+=dt*2.5;if(state.mins>=1320){state.day++;state.mins=480;state.energy=100;Object.values(state.plots).forEach(q=>{if(q.water){q.water=false;if(q.stage>=0)q.stage=Math.min(2,q.stage+1)}});msg(`Day ${state.day}. Another hot Sicilian morning.`);save()}
+ saveTimer+=dt;if(saveTimer>5){saveTimer=0;save()}ctx.clearRect(0,0,VW,VH);drawWorld();drawPlayer(t);hud();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);msg('Movement updated: joystick or tap anywhere to walk.');
 </script></body></html>
